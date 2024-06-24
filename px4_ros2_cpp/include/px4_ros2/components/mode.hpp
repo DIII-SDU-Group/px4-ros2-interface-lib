@@ -108,6 +108,12 @@ public:
    */
   bool doRegister();
 
+  /**
+   * Unregister the mode. Call this once on shutdown, unless there's an associated executor. This is a blocking method.
+   * @return true on success
+   */
+  bool doUnregister();
+
 
   /**
    * Report any custom mode requirements. This is called regularly, also while the mode is active.

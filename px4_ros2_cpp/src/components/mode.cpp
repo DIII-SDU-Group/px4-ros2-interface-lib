@@ -76,6 +76,25 @@ bool ModeBase::doRegister()
   return ret;
 }
 
+bool ModeBase::doUnregister()
+{
+  if (!_registration->registered()) {
+    return true;
+  }
+
+  _registration->doUnregister();
+
+  for (auto setpoint : _setpoint_types) {
+    _new_setpoint_types.push_back(setpoint.get());
+  }
+
+  _setpoint_types.clear();
+
+  _config_overrides.clear();
+
+  return true;
+}
+
 RegistrationSettings ModeBase::getRegistrationSettings() const
 {
   RegistrationSettings settings{};

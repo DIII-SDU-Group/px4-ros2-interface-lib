@@ -53,4 +53,11 @@ void ConfigOverrides::setup(uint8_t type, uint8_t id)
     _require_update_after_setup = false;
   }
 }
+
+void ConfigOverrides::clear()
+{
+  _current_overrides.source_type = 0;
+  _current_overrides.source_id = 0;
+  _is_setup = false;
+}
 } // namespace px4_ros2
