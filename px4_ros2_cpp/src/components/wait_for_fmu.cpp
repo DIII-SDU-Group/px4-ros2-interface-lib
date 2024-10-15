@@ -13,10 +13,10 @@ bool waitForFMU(
   rclcpp::Node & node, const rclcpp::Duration & timeout,
   const std::string & topic_namespace_prefix)
 {
-  RCLCPP_INFO(node.get_logger(), "Waiting for FMU...");
+  RCLCPP_DEBUG(node.get_logger(), "Waiting for FMU...");
   const rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr vehicle_status_sub =
     node.create_subscription<px4_msgs::msg::VehicleStatus>(
-    topic_namespace_prefix + "/fmu/out/vehicle_status", rclcpp::QoS(1).best_effort(),
+    topic_namespace_prefix + "fmu/out/vehicle_status", rclcpp::QoS(1).best_effort(),
     [](px4_msgs::msg::VehicleStatus::UniquePtr msg) {});
 
   rclcpp::WaitSet wait_set;
@@ -43,11 +43,11 @@ bool waitForFMU(
         got_message = true;
 
       } else {
-        RCLCPP_DEBUG(node.get_logger(), "no message received");
+        RCLCPP_DEBUG(node.get_logger(), "no VehicleStatus message received");
       }
 
     } else {
-      RCLCPP_DEBUG(node.get_logger(), "timeout");
+      RCLCPP_DEBUG(node.get_logger(), "timeout while waiting for FMU");
     }
   }
 

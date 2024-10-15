@@ -5,6 +5,7 @@
 
 #include "px4_ros2/components/mode_executor.hpp"
 #include "px4_ros2/components/message_compatibility_check.hpp"
+#include "px4_ros2/components/wait_for_fmu.hpp"
 
 #include "registration.hpp"
 
@@ -25,7 +26,7 @@ ModeExecutorBase::ModeExecutorBase(
   _config_overrides(node, topic_namespace_prefix)
 {
   _vehicle_status_sub = _node.create_subscription<px4_msgs::msg::VehicleStatus>(
-    topic_namespace_prefix + "/fmu/out/vehicle_status", rclcpp::QoS(1).best_effort(),
+    topic_namespace_prefix + "fmu/out/vehicle_status", rclcpp::QoS(1).best_effort(),
     [this](px4_msgs::msg::VehicleStatus::UniquePtr msg) {
       if (_registration->registered()) {
         vehicleStatusUpdated(msg);
@@ -33,10 +34,10 @@ ModeExecutorBase::ModeExecutorBase(
     });
 
   _vehicle_command_pub = _node.create_publisher<px4_msgs::msg::VehicleCommand>(
-    topic_namespace_prefix + "/fmu/in/vehicle_command_mode_executor", 1);
+    topic_namespace_prefix + "fmu/in/vehicle_command_mode_executor", 1);
 
   _vehicle_command_ack_sub = _node.create_subscription<px4_msgs::msg::VehicleCommandAck>(
-    topic_namespace_prefix + "/fmu/out/vehicle_command_ack", rclcpp::QoS(1).best_effort(),
+    topic_namespace_prefix + "fmu/out/vehicle_command_ack", rclcpp::QoS(1).best_effort(),
     [](px4_msgs::msg::VehicleCommandAck::UniquePtr msg) {});
 }
 
@@ -50,7 +51,9 @@ bool ModeExecutorBase::doRegister()
 
   assert(!_registration->registered());
 
-  if (!messageCompatibilityCheck(_node, {ALL_PX4_ROS2_MESSAGES}, _topic_namespace_prefix)) {
+  if (!waitForFMU(node(), 15s) ||
+    !messageCompatibilityCheck(node(), {ALL_PX4_ROS2_MESSAGES}, _topic_namespace_prefix))
+  {
     return false;
   }
 
@@ -59,7 +62,8 @@ bool ModeExecutorBase::doRegister()
   _owned_mode.unsubscribeVehicleStatus();
   RegistrationSettings settings = _owned_mode.getRegistrationSettings();
   settings.register_mode_executor = true;
-  settings.activate_mode_immediately = _settings.activate_immediately;
+  settings.activate_mode_immediately =
+    (_settings.activation == Settings::Activation::ActivateImmediately);
   bool ret = _registration->doRegister(settings);
 
   if (ret) {
@@ -153,7 +157,7 @@ Result ModeExecutorBase::sendCommandSync(
         }
 
       } else {
-        RCLCPP_DEBUG(_node.get_logger(), "no message received");
+        RCLCPP_DEBUG(_node.get_logger(), "no VehicleCommandAck message received");
       }
 
     } else {
@@ -289,9 +293,11 @@ void ModeExecutorBase::vehicleStatusUpdated(const px4_msgs::msg::VehicleStatus::
   const bool was_armed = _is_armed;
   const ModeBase::ModeID current_mode = static_cast<ModeBase::ModeID>(msg->nav_state);
   _is_armed = msg->arming_state == px4_msgs::msg::VehicleStatus::ARMING_STATE_ARMED;
-  const bool wants_to_activate_immediately = _settings.activate_immediately && _was_never_activated;
+  const bool wants_to_activate_immediately =
+    (_settings.activation == Settings::Activation::ActivateImmediately) && _was_never_activated;
   const bool is_in_charge = id() == msg->executor_in_charge &&
-    (_is_armed || wants_to_activate_immediately);
+    (_is_armed || wants_to_activate_immediately ||
+    _settings.activation == Settings::Activation::ActivateAlways);
   const bool changed_to_armed = !was_armed && _is_armed;
 
   bool got_activated = false;
@@ -376,7 +382,7 @@ bool ModeExecutorBase::deferFailsafesSync(bool enabled, int timeout_s)
           }
 
         } else {
-          RCLCPP_DEBUG(_node.get_logger(), "no message received");
+          RCLCPP_DEBUG(_node.get_logger(), "no VehicleStatus message received");
         }
 
       } else {
@@ -397,7 +403,7 @@ ModeExecutorBase::ScheduledMode::ScheduledMode(
   const std::string & topic_namespace_prefix)
 {
   _mode_completed_sub = node.create_subscription<px4_msgs::msg::ModeCompleted>(
-    topic_namespace_prefix + "/fmu/out/mode_completed", rclcpp::QoS(1).best_effort(),
+    topic_namespace_prefix + "fmu/out/mode_completed", rclcpp::QoS(1).best_effort(),
     [this, &node](px4_msgs::msg::ModeCompleted::UniquePtr msg) {
       if (active() && msg->nav_state == static_cast<uint8_t>(_mode_id)) {
         RCLCPP_DEBUG(
