@@ -1,10 +1,7 @@
 var searchData=
 [
-  ['radtodeg_90',['radToDeg',['../group__geometry.html#gaebb5ddb7bd8196fe4481ff91cd792b84',1,'px4_ros2']]],
-  ['ratessetpointtype_91',['RatesSetpointType',['../classpx4__ros2_1_1RatesSetpointType.html',1,'px4_ros2']]],
-  ['rejected_92',['Rejected',['../group__components.html#gga0d5805242f91956fd51e243091367f77ad37b1f6c0512e2118cee17fea015b699',1,'px4_ros2']]],
-  ['replace_5finternal_5fmode_93',['replace_internal_mode',['../structpx4__ros2_1_1ModeBase_1_1Settings.html#af61499f0183e347cb580407d64b4c3cd',1,'px4_ros2::ModeBase::Settings']]],
-  ['requirementflags_94',['RequirementFlags',['../structpx4__ros2_1_1RequirementFlags.html',1,'px4_ros2']]],
-  ['result_95',['Result',['../group__components.html#ga0d5805242f91956fd51e243091367f77',1,'px4_ros2']]],
-  ['roll_96',['roll',['../classpx4__ros2_1_1ManualControlInput.html#a377da17ccfb46fc042d5b1a98f9e4398',1,'px4_ros2::ManualControlInput::roll()'],['../classpx4__ros2_1_1OdometryAttitude.html#af40100c5121b4c584d347ccc4f6c95ac',1,'px4_ros2::OdometryAttitude::roll()']]]
+  ['quaterniontoeulerrpy_0',['quaternionToEulerRpy',['../group__geometry.html#gac2f8c4e4922abb0cffd03e6fc746b5bf',1,'px4_ros2']]],
+  ['quaterniontopitch_1',['quaternionToPitch',['../group__geometry.html#gacb1a4e729a428bc56c848707aa495787',1,'px4_ros2']]],
+  ['quaterniontoroll_2',['quaternionToRoll',['../group__geometry.html#ga6c0d59b58bc60adcdb56e89dd429c9d2',1,'px4_ros2']]],
+  ['quaterniontoyaw_3',['quaternionToYaw',['../group__geometry.html#gaf7e7ea1089241e844747111128658328',1,'px4_ros2']]]
 ];

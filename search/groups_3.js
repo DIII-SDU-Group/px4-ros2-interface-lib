@@ -1,5 +1,5 @@
 var searchData=
 [
-  ['geodesic_259',['Geodesic',['../group__geodesic.html',1,'']]],
-  ['geometry_260',['Geometry',['../group__geometry.html',1,'']]]
+  ['geodesic_0',['Geodesic',['../group__geodesic.html',1,'']]],
+  ['geometry_1',['Geometry',['../group__geometry.html',1,'']]]
 ];

@@ -1,9 +1,12 @@
 var searchData=
 [
-  ['heading_37',['heading',['../classpx4__ros2_1_1OdometryLocalPosition.html#a50193dab84758c3f08e5a5b947fad5f8',1,'px4_ros2::OdometryLocalPosition']]],
-  ['headingtoglobalposition_38',['headingToGlobalPosition',['../group__geodesic.html#gab67f76184e10f2c36954e1343dc269f7',1,'px4_ros2::headingToGlobalPosition(const Eigen::Vector2d &amp;global_position_now, const Eigen::Vector2d &amp;global_position_next)'],['../group__geodesic.html#ga58885d46925c00a7f93a7ccbede46672',1,'px4_ros2::headingToGlobalPosition(const Eigen::Vector3d &amp;global_position_now, const Eigen::Vector3d &amp;global_position_next)']]],
-  ['healthandarmingcheckreporter_39',['HealthAndArmingCheckReporter',['../classpx4__ros2_1_1HealthAndArmingCheckReporter.html',1,'px4_ros2']]],
-  ['healthandarmingchecks_40',['HealthAndArmingChecks',['../classpx4__ros2_1_1HealthAndArmingChecks.html',1,'px4_ros2']]],
-  ['horizontal_5fvariance_41',['horizontal_variance',['../structpx4__ros2_1_1GlobalPositionMeasurement.html#a098e08a4664b7708bb1a234ea0c96e4c',1,'px4_ros2::GlobalPositionMeasurement']]],
-  ['horizontaldistancetoglobalposition_42',['horizontalDistanceToGlobalPosition',['../group__geodesic.html#gac743119cb3987dfa6478aabc52c3a50e',1,'px4_ros2::horizontalDistanceToGlobalPosition(const Eigen::Vector2d &amp;global_position_now, const Eigen::Vector2d &amp;global_position_next)'],['../group__geodesic.html#ga0c23b4afb57270be82eef5962a9b01fb',1,'px4_ros2::horizontalDistanceToGlobalPosition(const Eigen::Vector3d &amp;global_position_now, const Eigen::Vector3d &amp;global_position_next)']]]
+  ['geodesic_0',['Geodesic',['../group__geodesic.html',1,'']]],
+  ['geometry_1',['Geometry',['../group__geometry.html',1,'']]],
+  ['globalpositionfromheadinganddist_2',['globalpositionfromheadinganddist',['../group__geodesic.html#gaa92c584dace2cc628ae7be52033056ce',1,'px4_ros2::globalPositionFromHeadingAndDist(const Eigen::Vector2d &amp;global_position_now, float heading, float dist)'],['../group__geodesic.html#ga26ba5aaaafcd9eb20b5ae8718d847bbb',1,'px4_ros2::globalPositionFromHeadingAndDist(const Eigen::Vector3d &amp;global_position_now, float heading, float dist)']]],
+  ['globalpositionfromlineanddist_3',['globalPositionFromLineAndDist',['../group__geodesic.html#gae85bc381781adf133ebeaa360ea8ab11',1,'px4_ros2']]],
+  ['globalpositionmeasurement_4',['GlobalPositionMeasurement',['../structpx4__ros2_1_1GlobalPositionMeasurement.html',1,'px4_ros2']]],
+  ['globalpositionmeasurementinterface_5',['GlobalPositionMeasurementInterface',['../classpx4__ros2_1_1GlobalPositionMeasurementInterface.html',1,'px4_ros2']]],
+  ['globaltolocal_6',['globaltolocal',['../classpx4__ros2_1_1MapProjection.html#a3e0543785512cb358f1cdf13e5d31a94',1,'px4_ros2::MapProjection::globalToLocal(const Eigen::Vector2d &amp;global_position) const'],['../classpx4__ros2_1_1MapProjection.html#af288641107d8f2c7fe3e518a212a9e9a',1,'px4_ros2::MapProjection::globalToLocal(const Eigen::Vector3d &amp;global_position) const']]],
+  ['gotoglobalsetpointtype_7',['GotoGlobalSetpointType',['../classpx4__ros2_1_1GotoGlobalSetpointType.html',1,'px4_ros2']]],
+  ['gotosetpointtype_8',['GotoSetpointType',['../classpx4__ros2_1_1GotoSetpointType.html',1,'px4_ros2']]]
 ];

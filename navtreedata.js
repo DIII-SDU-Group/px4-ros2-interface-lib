@@ -34,7 +34,7 @@ var NAVTREE =
         [ "Linters (code formatting etc)", "index.html#autotoc_md7", null ]
       ] ]
     ] ],
-    [ "Modules", "modules.html", "modules" ],
+    [ "Topics", "topics.html", "topics" ],
     [ "Classes", "annotated.html", [
       [ "Class List", "annotated.html", "annotated_dup" ],
       [ "Class Index", "classes.html", null ],
@@ -43,7 +43,8 @@ var NAVTREE =
         [ "All", "functions.html", null ],
         [ "Functions", "functions_func.html", null ],
         [ "Variables", "functions_vars.html", null ],
-        [ "Typedefs", "functions_type.html", null ]
+        [ "Typedefs", "functions_type.html", null ],
+        [ "Enumerations", "functions_enum.html", null ]
       ] ]
     ] ],
     [ "Files", "files.html", [
@@ -54,8 +55,7 @@ var NAVTREE =
 
 var NAVTREEINDEX =
 [
-"annotated.html",
-"group__geodesic.html#ga0c23b4afb57270be82eef5962a9b01fb"
+"angular__velocity_8hpp_source.html"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';
