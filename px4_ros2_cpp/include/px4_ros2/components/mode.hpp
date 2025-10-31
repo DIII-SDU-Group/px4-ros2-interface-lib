@@ -82,6 +82,8 @@ public:
     px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_AUTO_LAND;
   static constexpr ModeID kModeIDRtl =
     px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_AUTO_RTL;
+  static constexpr ModeID kModeIDPrecisionLand =
+    px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_AUTO_PRECLAND;
 
   struct Settings
   {
@@ -107,6 +109,12 @@ public:
    * @return true on success
    */
   bool doRegister();
+
+  /**
+   * Unregister the mode. Call this once on shutdown, unless there's an associated executor. This is a blocking method.
+   * @return true on success
+   */
+  bool doUnregister();
 
 
   /**

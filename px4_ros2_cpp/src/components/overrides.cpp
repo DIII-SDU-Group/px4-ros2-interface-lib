@@ -14,7 +14,7 @@ ConfigOverrides::ConfigOverrides(rclcpp::Node & node, const std::string & topic_
 : _node(node)
 {
   _config_overrides_pub = _node.create_publisher<px4_msgs::msg::ConfigOverrides>(
-    topic_namespace_prefix + "/fmu/in/config_overrides_request", 1);
+    topic_namespace_prefix + "fmu/in/config_overrides_request", 1);
 }
 
 void ConfigOverrides::controlAutoDisarm(bool enabled)
@@ -52,5 +52,12 @@ void ConfigOverrides::setup(uint8_t type, uint8_t id)
     update();
     _require_update_after_setup = false;
   }
+}
+
+void ConfigOverrides::clear()
+{
+  _current_overrides.source_type = 0;
+  _current_overrides.source_id = 0;
+  _is_setup = false;
 }
 } // namespace px4_ros2

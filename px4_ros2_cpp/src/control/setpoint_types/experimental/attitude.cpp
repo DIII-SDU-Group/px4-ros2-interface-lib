@@ -15,7 +15,7 @@ AttitudeSetpointType::AttitudeSetpointType(Context & context)
 {
   _vehicle_attitude_setpoint_pub =
     context.node().create_publisher<px4_msgs::msg::VehicleAttitudeSetpoint>(
-    context.topicNamespacePrefix() + "/fmu/in/vehicle_attitude_setpoint", 1);
+    context.topicNamespacePrefix() + "fmu/in/vehicle_attitude_setpoint", 1);
 }
 
 void AttitudeSetpointType::update(
@@ -49,10 +49,6 @@ void AttitudeSetpointType::update(
 
   px4_msgs::msg::VehicleAttitudeSetpoint sp{};
   sp.timestamp = _node.get_clock()->now().nanoseconds() / 1000;
-
-  sp.roll_body = roll;
-  sp.pitch_body = pitch;
-  sp.yaw_body = yaw;
 
   sp.yaw_sp_move_rate = yaw_sp_move_rate_rad_s;
 

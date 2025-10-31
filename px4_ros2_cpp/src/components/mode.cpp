@@ -5,6 +5,7 @@
 
 #include "px4_ros2/components/mode.hpp"
 #include "px4_ros2/components/message_compatibility_check.hpp"
+#include "px4_ros2/components/wait_for_fmu.hpp"
 
 #include "registration.hpp"
 
@@ -27,16 +28,16 @@ ModeBase::ModeBase(
     topic_namespace_prefix), _config_overrides(node, topic_namespace_prefix)
 {
   _vehicle_status_sub = node.create_subscription<px4_msgs::msg::VehicleStatus>(
-    topic_namespace_prefix + "/fmu/out/vehicle_status", rclcpp::QoS(1).best_effort(),
+    topic_namespace_prefix + "fmu/out/vehicle_status", rclcpp::QoS(1).best_effort(),
     [this](px4_msgs::msg::VehicleStatus::UniquePtr msg) {
       if (_registration->registered()) {
         vehicleStatusUpdated(msg);
       }
     });
   _mode_completed_pub = node.create_publisher<px4_msgs::msg::ModeCompleted>(
-    topic_namespace_prefix + "/fmu/in/mode_completed", 1);
+    topic_namespace_prefix + "fmu/in/mode_completed", 1);
   _config_control_setpoints_pub = node.create_publisher<px4_msgs::msg::VehicleControlMode>(
-    topic_namespace_prefix + "/fmu/in/config_control_setpoints", 1);
+    topic_namespace_prefix + "fmu/in/config_control_setpoints", 1);
 }
 
 ModeBase::ModeID ModeBase::id() const
@@ -55,8 +56,8 @@ bool ModeBase::doRegister()
 {
   assert(!_registration->registered());
 
-  if (!_skip_message_compatibility_check &&
-    !messageCompatibilityCheck(node(), {ALL_PX4_ROS2_MESSAGES}, topicNamespacePrefix()))
+  if (!_skip_message_compatibility_check && (!waitForFMU(node(), 15s) ||
+    !messageCompatibilityCheck(node(), {ALL_PX4_ROS2_MESSAGES}, topicNamespacePrefix())))
   {
     return false;
   }
@@ -74,6 +75,25 @@ bool ModeBase::doRegister()
   }
 
   return ret;
+}
+
+bool ModeBase::doUnregister()
+{
+  if (!_registration->registered()) {
+    return true;
+  }
+
+  _registration->doUnregister();
+
+  for (auto setpoint : _setpoint_types) {
+    _new_setpoint_types.push_back(setpoint.get());
+  }
+
+  _setpoint_types.clear();
+
+  _config_overrides.clear();
+
+  return true;
 }
 
 RegistrationSettings ModeBase::getRegistrationSettings() const

@@ -130,7 +130,7 @@ private:
 
   RequirementFlags _mode_requirements{};
   rclcpp::TimerBase::SharedPtr _watchdog_timer;
-  bool _shutdown_on_timeout{true};
+  bool _shutdown_on_timeout{false};
 };
 
 } // namespace px4_ros2

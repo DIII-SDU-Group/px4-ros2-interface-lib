@@ -16,7 +16,7 @@ GlobalPositionMeasurementInterface::GlobalPositionMeasurementInterface(rclcpp::N
 {
   _aux_global_position_pub =
     node.create_publisher<VehicleGlobalPosition>(
-    topicNamespacePrefix() + "/fmu/in/aux_global_position", 10);
+    topicNamespacePrefix() + "fmu/in/aux_global_position", 10);
 }
 
 void GlobalPositionMeasurementInterface::update(
@@ -41,6 +41,7 @@ void GlobalPositionMeasurementInterface::update(
 
   // Populate aux global position
   VehicleGlobalPosition aux_global_position;
+  aux_global_position.lat_lon_reset_counter = _lat_lon_reset_counter;
 
   aux_global_position.timestamp_sample =
     global_position_measurement.timestamp_sample.nanoseconds() *
