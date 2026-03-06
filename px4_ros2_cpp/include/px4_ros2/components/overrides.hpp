@@ -5,33 +5,31 @@
 
 #pragma once
 
+#include <px4_msgs/msg/config_overrides.hpp>
 #include <rclcpp/rclcpp.hpp>
 
-#include <px4_msgs/msg/config_overrides.hpp>
-
-namespace px4_ros2
-{
+namespace px4_ros2 {
 
 class ModeBase;
 class ModeExecutorBase;
 
-class ConfigOverrides
-{
-public:
-  explicit ConfigOverrides(rclcpp::Node & node, const std::string & topic_namespace_prefix = "");
+class ConfigOverrides {
+ public:
+  explicit ConfigOverrides(rclcpp::Node& node, const std::string& topic_namespace_prefix = "");
 
   void controlAutoDisarm(bool enabled);
 
-private:
+ private:
   void update();
 
   friend class ModeBase;
   friend class ModeExecutorBase;
+  void controlAutoSetHome(bool enabled);
   void deferFailsafes(bool enabled, int timeout_s = 0);
   void setup(uint8_t type, uint8_t id);
   void clear();
 
-  rclcpp::Node & _node;
+  rclcpp::Node& _node;
 
   px4_msgs::msg::ConfigOverrides _current_overrides{};
   rclcpp::Publisher<px4_msgs::msg::ConfigOverrides>::SharedPtr _config_overrides_pub;
@@ -39,4 +37,4 @@ private:
   bool _require_update_after_setup{false};
 };
 
-} // namespace px4_ros2
+}  // namespace px4_ros2

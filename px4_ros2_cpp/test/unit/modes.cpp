@@ -4,19 +4,18 @@
  ****************************************************************************/
 
 #include <gtest/gtest.h>
-#include <rclcpp/rclcpp.hpp>
-#include <px4_ros2/components/health_and_arming_checks.hpp>
+
 #include <px4_ros2/components/mode.hpp>
 #include <px4_ros2/components/node_with_mode.hpp>
 #include <px4_ros2/control/setpoint_types/experimental/rates.hpp>
 #include <px4_ros2/odometry/global_position.hpp>
+#include <rclcpp/rclcpp.hpp>
+
 #include "fake_registration.hpp"
 
-class TestMode : public px4_ros2::ModeBase
-{
-public:
-  explicit TestMode(rclcpp::Node & node)
-  : ModeBase(node, std::string("test"))
+class TestMode : public px4_ros2::ModeBase {
+ public:
+  explicit TestMode(rclcpp::Node& node) : ModeBase(node, std::string("test"))
   {
     EXPECT_FALSE(modeRequirements().manual_control);
     EXPECT_FALSE(modeRequirements().angular_velocity);
@@ -25,16 +24,15 @@ public:
     _rates_setpoint = std::make_shared<px4_ros2::RatesSetpointType>(*this);
     _global_position = std::make_shared<px4_ros2::OdometryGlobalPosition>(*this);
     EXPECT_TRUE(modeRequirements().manual_control);
-    EXPECT_FALSE(modeRequirements().angular_velocity); // Setpoint requirements are only set after registration
+    EXPECT_FALSE(modeRequirements()
+                     .angular_velocity);  // Setpoint requirements are only set after registration
     EXPECT_TRUE(modeRequirements().global_position);
 
     setSkipMessageCompatibilityCheck();
     overrideRegistration(std::make_shared<FakeRegistration>(node));
   }
-  void onActivate() override {}
-  void onDeactivate() override {}
 
-private:
+ private:
   std::shared_ptr<px4_ros2::ManualControlInput> _manual_control_input;
   std::shared_ptr<px4_ros2::RatesSetpointType> _rates_setpoint;
   std::shared_ptr<px4_ros2::OdometryGlobalPosition> _global_position;

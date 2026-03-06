@@ -5,12 +5,13 @@
 
 #pragma once
 
-#include <rclcpp/rclcpp.hpp>
 #include <px4_ros2/components/mode.hpp>
 #include <px4_ros2/components/wait_for_fmu.hpp>
+#include <rclcpp/rclcpp.hpp>
+#include <tuple>
+#include <utility>
 
-namespace px4_ros2
-{
+namespace px4_ros2 {
 /** \ingroup components
  *  @{
  */
@@ -28,20 +29,18 @@ namespace px4_ros2
  *
  * @ingroup components
  */
-template<typename ModeT>
-class NodeWithMode : public rclcpp::Node
-{
-  static_assert(
-    std::is_base_of<ModeBase, ModeT>::value,
-    "Template type ModeT must be derived from px4_ros2::ModeBase");
+template <typename ModeT>
+class NodeWithMode : public rclcpp::Node {
+  static_assert(std::is_base_of_v<ModeBase, ModeT>,
+                "Template type ModeT must be derived from px4_ros2::ModeBase");
 
-public:
-  explicit NodeWithMode(std::string node_name, bool enable_debug_output = false)
-  : Node(node_name)
+ public:
+  explicit NodeWithMode(const std::string& node_name, bool enable_debug_output = false)
+      : Node(node_name)
   {
     if (enable_debug_output) {
       auto ret =
-        rcutils_logging_set_logger_level(get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
+          rcutils_logging_set_logger_level(get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
 
       if (ret != RCUTILS_RET_OK) {
         RCLCPP_ERROR(get_logger(), "Error setting severity: %s", rcutils_get_error_string().str);
@@ -52,26 +51,29 @@ public:
     _mode = std::make_unique<ModeT>(*this);
 
     if (!_mode->doRegister()) {
-      throw std::runtime_error("Registration failed");
+      throw Exception("Registration failed");
     }
   }
 
-  ModeT & getMode() const
-  {
-    return *_mode;
-  }
+  ModeT& getMode() const { return *_mode; }
 
-private:
+ private:
   std::unique_ptr<ModeT> _mode;
 };
 
 /**
- * @brief A ROS2 node which instantiates a mode executor and its owned mode, and handles their registration with PX4.
+ * @brief A ROS2 node which instantiates a mode executor and its owned mode, and handles their
+ * registration with PX4.
  *
- * Assumes mode executor constructor signature is `ModeExecutorT(rclcpp::Node, ModeT)`.
+ * Assumes mode executor constructor signature is `ModeExecutorT(rclcpp::Node, OwnedModeT,
+ * OtherModesT...)`.
  *
- * @tparam ModeExecutorT The mode executor type, which must be derived from px4_ros2::ModeExecutorBase.
- * @tparam ModeT The mode type owned by the executor, which must be derived from px4_ros2::ModeBase.
+ * @tparam ModeExecutorT The mode executor type, which must be derived from
+ * px4_ros2::ModeExecutorBase.
+ * @tparam OwnedModeT The mode type owned by the executor, which must be derived from
+ * px4_ros2::ModeBase.
+ * @tparam OtherModesT Optional additional modes not owned by the executor but registered by the
+ * node, which must be derived from px4_ros2::ModeBase.
  *
  * Example usage:
  *
@@ -83,23 +85,21 @@ private:
  *
  * @ingroup components
  */
-template<typename ModeExecutorT, typename ModeT>
-class NodeWithModeExecutor : public rclcpp::Node
-{
+template <typename ModeExecutorT, typename OwnedModeT, typename... OtherModesT>
+class NodeWithModeExecutor : public rclcpp::Node {
+  static_assert(std::is_base_of_v<ModeExecutorBase, ModeExecutorT>,
+                "Template type ModeExecutorT must be derived from px4_ros2::ModeExecutorBase");
   static_assert(
-    std::is_base_of<ModeExecutorBase, ModeExecutorT>::value,
-    "Template type ModeExecutorT must be derived from px4_ros2::ModeExecutorBase");
-  static_assert(
-    std::is_base_of<ModeBase, ModeT>::value,
-    "Template type ModeT must be derived from px4_ros2::ModeBase");
+      (std::is_base_of_v<ModeBase, OwnedModeT> && ... && std::is_base_of_v<ModeBase, OtherModesT>),
+      "Template types OwnedModeT and OtherModesT must be derived from px4_ros2::ModeBase");
 
-public:
+ public:
   explicit NodeWithModeExecutor(std::string node_name, bool enable_debug_output = false)
-  : Node(node_name)
+      : Node(node_name)
   {
     if (enable_debug_output) {
       auto ret =
-        rcutils_logging_set_logger_level(get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
+          rcutils_logging_set_logger_level(get_logger().get_name(), RCUTILS_LOG_SEVERITY_DEBUG);
 
       if (ret != RCUTILS_RET_OK) {
         RCLCPP_ERROR(get_logger(), "Error setting severity: %s", rcutils_get_error_string().str);
@@ -107,22 +107,45 @@ public:
       }
     }
 
-    _mode = std::make_unique<ModeT>(*this);
-    _mode_executor = std::make_unique<ModeExecutorT>(*this, *_mode);
+    _owned_mode = std::make_unique<OwnedModeT>(*this);
+    _other_modes = std::make_tuple(std::make_unique<OtherModesT>(*this)...);
+    _mode_executor = createModeExecutor(std::index_sequence_for<OtherModesT...>{});
 
-    if (!_mode_executor->doRegister()) {
-      throw std::runtime_error("Registration failed");
+    if (!_mode_executor->doRegister() || !std::apply(
+                                             [](const auto&... mode) {
+                                               // *INDENT-OFF*
+                                               return (mode->doRegister() && ...);
+                                               // *INDENT-ON*
+                                             },
+                                             _other_modes)) {
+      throw Exception("Registration failed");
     }
   }
 
-  ModeT & getMode() const
+  template <typename ModeT = OwnedModeT>
+  ModeT& getMode() const
   {
-    return *_mode;
+    if constexpr (std::is_same_v<ModeT, OwnedModeT>) {
+      return *_owned_mode;
+    } else {
+      return *std::get<ModeT>(_other_modes);
+    }
   }
 
-private:
+ private:
+  template <std::size_t... Idx>
+  auto createModeExecutor(std::index_sequence<Idx...>)
+  {
+    if constexpr (sizeof...(Idx) == 0) {
+      return std::make_unique<ModeExecutorT>(*_owned_mode);
+    } else {
+      return std::make_unique<ModeExecutorT>(*_owned_mode, *std::get<Idx>(_other_modes)...);
+    }
+  }
+
   std::unique_ptr<ModeExecutorT> _mode_executor;
-  std::unique_ptr<ModeT> _mode;
+  std::unique_ptr<OwnedModeT> _owned_mode;
+  std::tuple<std::unique_ptr<OtherModesT>...> _other_modes;
 };
 
 /** @}*/

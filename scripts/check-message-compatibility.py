@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-""" Check message compatibility between two repositories containing a msg/ directory of .msg message definitions """
+"""Check message compatibility between two repositories containing a msg/ directory of .msg message definitions"""
 
 from __future__ import annotations  # for Python 3.8 compatibility
 import os
@@ -10,8 +10,8 @@ import argparse
 
 from typing import Optional
 
-TOPIC_LIST_FILE = 'px4_ros2_cpp/include/px4_ros2/components/message_compatibility_check.hpp'
-MESSAGES_DEFINE = 'ALL_PX4_ROS2_MESSAGES'
+TOPIC_LIST_FILE = "px4_ros2_cpp/include/px4_ros2/components/message_compatibility_check.hpp"
+MESSAGES_DEFINE = "ALL_PX4_ROS2_MESSAGES"
 
 
 def message_fields_str_for_message_hash(topic_type: str, msgs_dir: str) -> str:
@@ -19,9 +19,11 @@ def message_fields_str_for_message_hash(topic_type: str, msgs_dir: str) -> str:
     Reads the .msg file corresponding to the given topic type, extracts field definitions,
     and recursively processes nested types to generate a string representation of all fields.
     """
-    filename = f"{msgs_dir}/msg/{topic_type}.msg"
+    filename = find_file_in_subfolders(f"{msgs_dir}/", f"{topic_type}.msg")
+    if filename is None:
+        raise FileNotFoundError(f"Message definition file {topic_type}.msg not found in {msgs_dir}")
     try:
-        with open(filename, 'r') as file:
+        with open(filename, "r") as file:
             text = file.read()
     except IOError:
         print(f"Failed to open {filename}")
@@ -30,15 +32,25 @@ def message_fields_str_for_message_hash(topic_type: str, msgs_dir: str) -> str:
     fields_str = ""
 
     # Regular expression to match field types from .msg definitions
-    msg_field_type_regex = re.compile(
-        r"(?:^|\n)\s*([a-zA-Z0-9_/]+)(\[[^\]]*\])?\s+(\w+)[ \t]*(=)?"
-    )
+    msg_field_type_regex = re.compile(r"(?:^|\n)\s*([a-zA-Z0-9_/]+)(\[[^\]]*\])?\s+(\w+)[ \t]*(=)?")
 
     # Set of basic types
     basic_types = {
-        "bool", "byte", "char", "float32", "float64",
-        "int8", "uint8", "int16", "uint16", "int32",
-        "uint32", "int64", "uint64", "string", "wstring"
+        "bool",
+        "byte",
+        "char",
+        "float32",
+        "float64",
+        "int8",
+        "uint8",
+        "int16",
+        "uint16",
+        "int32",
+        "uint32",
+        "int64",
+        "uint64",
+        "string",
+        "wstring",
     }
 
     # Iterate over all matches in the text
@@ -51,7 +63,7 @@ def message_fields_str_for_message_hash(topic_type: str, msgs_dir: str) -> str:
         fields_str += f"{type_}{array} {field_name}\n"
 
         if type_ not in basic_types:
-            if '/' not in type_:
+            if "/" not in type_:
                 # Recursive call to handle nested types
                 fields_str += message_fields_str_for_message_hash(type_, msgs_dir)
             else:
@@ -62,7 +74,7 @@ def message_fields_str_for_message_hash(topic_type: str, msgs_dir: str) -> str:
 
 def hash32_fnv1a_const(s: str) -> int:
     """Computes the 32-bit FNV-1a hash of a given string"""
-    kVal32Const = 0x811c9dc5
+    kVal32Const = 0x811C9DC5
     kPrime32Const = 0x1000193
     hash_value = kVal32Const
     for c in s:
@@ -80,11 +92,14 @@ def message_hash(topic_type: str, msgs_dir: str) -> int:
 
 def snake_to_pascal(name: str) -> str:
     """Convert snake_case to PascalCase"""
-    return f'{name.replace("_", " ").title().replace(" ", "")}'
+    return f"{name.replace('_', ' ').title().replace(' ', '')}"
 
 
-def extract_message_type_from_file(filename: str, extract_start_after: Optional[str] = None,
-                                   extract_end_before: Optional[str] = None) -> list[str]:
+def extract_message_type_from_file(
+    filename: str,
+    extract_start_after: Optional[str] = None,
+    extract_end_before: Optional[str] = None,
+) -> list[str]:
     """Extract message type names from a given file"""
     with open(filename) as file:
         if extract_start_after is not None:
@@ -110,14 +125,23 @@ def extract_message_type_from_file(filename: str, extract_start_after: Optional[
 
 
 def compare_files(file1: str, file2: str):
-    """Compare two files and print their differences. """
-    with open(file1, 'r') as f1, open(file2, 'r') as f2:
+    """Compare two files and print their differences."""
+    with open(file1, "r") as f1, open(file2, "r") as f2:
         diff = list(difflib.unified_diff(f1.readlines(), f2.readlines(), fromfile=file1, tofile=file2))
         if diff:
-            print(f"Mismatch found between {file1} and {file2}:")
-            print(''.join(diff), end='\n\n')
+            print(f"Mismatch found between {file1} and {file2}: ")
+            print("".join(diff), end="\n\n")
             return False
     return True
+
+
+def find_file_in_subfolders(root_dir, filename):
+    if filename in os.listdir(root_dir):
+        return os.path.join(root_dir, filename)
+    for dirpath, _, filenames in os.walk(root_dir):
+        if filename in filenames:
+            return os.path.join(dirpath, filename)
+    return None
 
 
 def main(repo1: str, repo2: str, verbose: bool = False):
@@ -126,50 +150,73 @@ def main(repo1: str, repo2: str, verbose: bool = False):
         sys.exit(1)
 
     # Retrieve list of message types to check
-    messages_types = sorted(extract_message_type_from_file(
-        os.path.join(os.path.dirname(__file__), '..', TOPIC_LIST_FILE),
-        MESSAGES_DEFINE,
-        r'^\s*$')
+    messages_types = sorted(
+        extract_message_type_from_file(
+            os.path.join(os.path.dirname(__file__), "..", TOPIC_LIST_FILE),
+            MESSAGES_DEFINE,
+            r"^\s*$",
+        )
     )
 
     if verbose:
-        print("Checking the following message files:", end='\n\n')
+        print("Checking the following message files:", end="\n\n")
         for msg_type in messages_types:
-            print(f"  - {msg_type}.msg")
+            print(f" - {msg_type}.msg")
         print()
 
     # Find mismatches
     incompatible_types = []
+    missing_types = []
     for msg_type in messages_types:
-        if message_hash(msg_type, repo1) != message_hash(msg_type, repo2):
-            incompatible_types.append(msg_type)
+        try:
+            if message_hash(msg_type, repo1) != message_hash(msg_type, repo2):
+                incompatible_types.append(msg_type)
+        except FileNotFoundError as e:
+            print(f"Error: {e}")
+            missing_types.append(msg_type)
 
     # Print result
-    if not incompatible_types:
+    success = not incompatible_types and not missing_types
+    if success:
         print("OK! Messages are compatible.")
         sys.exit(0)
     else:
         if verbose:
             for msg_type in incompatible_types:
-                file1 = os.path.join(repo1, 'msg', f'{msg_type}.msg')
-                file2 = os.path.join(repo2, 'msg', f'{msg_type}.msg')
+                file1 = find_file_in_subfolders(os.path.join(repo1, "msg"), f"{msg_type}.msg")
+                file2 = find_file_in_subfolders(os.path.join(repo2, "msg"), f"{msg_type}.msg")
                 compare_files(file1, file2)
-            print("Note: The printed diff includes all content differences. "
-                  "The computed check is less sensitive to formatting and comments.", end='\n\n')
-        print("FAILED! Some files differ:")
-        for msg_type in incompatible_types:
-            print(f"  - {msg_type}.msg")
+            print(
+                "Note: The printed diff includes all content differences. "
+                "The computed check is less sensitive to formatting and comments.",
+                end="\n\n",
+            )
+        print("FAILED!", end=" ")
+        if incompatible_types:
+            print("Some files differ:")
+            print("\n".join(f" - {msg_type}.msg" for msg_type in incompatible_types))
+        if missing_types:
+            print("The following message types were not found in one of the repositories:")
+            print("\n".join(f" - {msg_type}.msg" for msg_type in missing_types))
         sys.exit(1)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Check message compatibility between two repositories \
-                                                  using the set of checked messages ALL_PX4_ROS2_MESSAGES.")
-    parser.add_argument('repo1', help="path to the first repo containing a msg/ directory \
-                                       (e.g /path/to/px4_msgs/)")
-    parser.add_argument('repo2', help="path to the second repo containing a msg/ directory \
-                                       (e.g /path/to/PX4-Autopilot/)")
-    parser.add_argument('-v', '--verbose', dest='verbose', action='store_true', help='verbose output')
+    parser = argparse.ArgumentParser(
+        description="Check message compatibility between two repositories \
+                                                  using the set of checked messages ALL_PX4_ROS2_MESSAGES."
+    )
+    parser.add_argument(
+        "repo1",
+        help="path to the first repo containing a msg/ directory \
+                                       (e.g /path/to/px4_msgs/)",
+    )
+    parser.add_argument(
+        "repo2",
+        help="path to the second repo containing a msg/ directory \
+                                       (e.g /path/to/PX4-Autopilot/)",
+    )
+    parser.add_argument("-v", "--verbose", dest="verbose", action="store_true", help="verbose output")
     args = parser.parse_args()
 
     main(args.repo1, args.repo2, args.verbose)
