@@ -12,6 +12,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <px4_msgs/msg/vehicle_control_mode.hpp>
 #include "context.hpp"
+#include "exception.hpp"
 
 namespace px4_ros2
 {
@@ -43,7 +44,7 @@ public:
     bool acceleration_enabled{true};
     bool velocity_enabled{true};
     bool position_enabled{true};
-
+    bool local_position_is_optional{false};
     bool climb_rate_enabled{false};
 
     bool offboard_enabled{true};
@@ -61,7 +62,7 @@ public:
     try {
       return shared_from_this();
     } catch (const std::bad_weak_ptr & exception) {
-      throw std::runtime_error("Setpoint must be instantiated with std::make_shared<>");
+      throw Exception("Setpoint must be instantiated with std::make_shared<>");
     }
     return {};
   }

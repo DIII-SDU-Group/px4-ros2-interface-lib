@@ -5,6 +5,7 @@
 
 #include "registration.hpp"
 #include "px4_ros2/components/health_and_arming_checks.hpp"
+#include "px4_ros2/utils/message_version.hpp"
 
 #include <cassert>
 #include <utility>
@@ -21,10 +22,13 @@ HealthAndArmingChecks::HealthAndArmingChecks(
   _check_callback(std::move(check_callback))
 {
   _arming_check_reply_pub = _node.create_publisher<px4_msgs::msg::ArmingCheckReply>(
-    topic_namespace_prefix + "fmu/in/arming_check_reply", 1);
+    topic_namespace_prefix + "fmu/in/arming_check_reply" +
+    px4_ros2::getMessageNameVersion<px4_msgs::msg::ArmingCheckReply>(),
+    1);
 
   _arming_check_request_sub = _node.create_subscription<px4_msgs::msg::ArmingCheckRequest>(
-    topic_namespace_prefix + "fmu/out/arming_check_request",
+    topic_namespace_prefix + "fmu/out/arming_check_request" +
+    px4_ros2::getMessageNameVersion<px4_msgs::msg::ArmingCheckRequest>(),
     rclcpp::QoS(1).best_effort(),
     [this](px4_msgs::msg::ArmingCheckRequest::UniquePtr msg) {
 
@@ -43,9 +47,20 @@ HealthAndArmingChecks::HealthAndArmingChecks(
 
         _mode_requirements.fillArmingCheckReply(reply);
 
-        reply.timestamp = _node.get_clock()->now().nanoseconds() / 1000;
+        reply.timestamp = 0; // Let PX4 set the timestamp
         _arming_check_reply_pub->publish(reply);
-        _check_triggered = true;
+
+        // Check if our registration id is still valid. If not, we still send the reply,
+        // as it might be flagged as unresponsive, but we don't update the timer check.
+        // The first request might not have the bit set yet.
+        if (_first_request || (msg->valid_registrations_mask & (1U << reply.registration_id))) {
+          _check_triggered = true;
+        } else {
+          RCLCPP_ERROR_ONCE(
+            _node.get_logger(), "Registration id %i is flagged as invalid (only printed once)",
+            reply.registration_id);
+        }
+        _first_request = false;
 
       } else {
         RCLCPP_DEBUG(_node.get_logger(), "...not registered yet");
@@ -68,6 +83,7 @@ bool HealthAndArmingChecks::doRegister(const std::string & name)
   RegistrationSettings settings{};
   settings.name = name;
   settings.register_arming_check = true;
+  _first_request = true;
   return _registration->doRegister(settings);
 }
 
@@ -76,7 +92,7 @@ void HealthAndArmingChecks::watchdogTimerUpdate()
   if (_registration->registered()) {
     if (!_check_triggered && _shutdown_on_timeout) {
       rclcpp::shutdown();
-      throw std::runtime_error(
+      throw Exception(
               "Timeout, no request received from FMU, exiting (this can happen on FMU reboots)");
     }
 

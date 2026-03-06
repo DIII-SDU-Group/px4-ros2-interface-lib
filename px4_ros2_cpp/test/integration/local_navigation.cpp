@@ -19,6 +19,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <px4_msgs/msg/estimator_status_flags.hpp>
 #include <px4_ros2/navigation/experimental/local_position_measurement_interface.hpp>
+#include <px4_ros2/utils/message_version.hpp>
 #include "util.hpp"
 
 using namespace std::chrono_literals;
@@ -32,6 +33,8 @@ protected:
   {
     _node = initNode();
 
+    _executor.add_node(_node);
+
     _local_navigation_interface = std::make_shared<LocalPositionMeasurementInterface>(
       *_node, px4_ros2::PoseFrame::LocalNED,
       px4_ros2::VelocityFrame::LocalNED);
@@ -40,7 +43,9 @@ protected:
 
     // Subscribe to PX4 EKF estimator status flags
     _subscriber = _node->create_subscription<EstimatorStatusFlags>(
-      "fmu/out/estimator_status_flags", rclcpp::QoS(10).best_effort(),
+      "fmu/out/estimator_status_flags" + px4_ros2::getMessageNameVersion<EstimatorStatusFlags>(),
+      rclcpp::QoS(
+        10).best_effort(),
       [this](EstimatorStatusFlags::UniquePtr msg) {
         _estimator_status_flags = std::move(msg);
       });
@@ -54,7 +59,7 @@ protected:
     while (_estimator_status_flags->cs_ev_pos || _estimator_status_flags->cs_ev_hgt ||
       _estimator_status_flags->cs_ev_vel || _estimator_status_flags->cs_ev_yaw)
     {
-      rclcpp::spin_some(_node);
+      _executor.spin_some();
       rclcpp::sleep_for(kSleepInterval);
 
       const auto elapsed_time = _node->now() - start_time;
@@ -84,7 +89,7 @@ protected:
         _local_navigation_interface->update(*measurement)
       ) << "Failed to send position measurement update via LocalPositionMeasurementInterface.";
 
-      rclcpp::spin_some(_node);
+      _executor.spin_some();
 
       // Check timeout
       const auto elapsed_time = _node->now() - start_time;
@@ -104,6 +109,7 @@ protected:
   }
 
   std::shared_ptr<rclcpp::Node> _node;
+  rclcpp::executors::SingleThreadedExecutor _executor;
   std::shared_ptr<LocalPositionMeasurementInterface> _local_navigation_interface;
   rclcpp::Subscription<EstimatorStatusFlags>::SharedPtr _subscriber;
   EstimatorStatusFlags::UniquePtr _estimator_status_flags;

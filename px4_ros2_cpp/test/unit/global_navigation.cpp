@@ -16,6 +16,7 @@
 #include <gtest/gtest.h>
 #include <rclcpp/rclcpp.hpp>
 #include <px4_ros2/navigation/experimental/global_position_measurement_interface.hpp>
+#include <px4_ros2/utils/message_version.hpp>
 
 using px4_ros2::GlobalPositionMeasurement, px4_ros2::NavigationInterfaceInvalidArgument;
 using namespace std::chrono_literals;
@@ -26,6 +27,8 @@ protected:
   void SetUp() override
   {
     _node = std::make_shared<rclcpp::Node>("test_node");
+
+    _executor.add_node(_node);
 
     // Suppress logging for exception handling tests
     auto ret = rcutils_logging_set_logger_level(
@@ -41,7 +44,9 @@ protected:
       *_node);
     _subscriber =
       _node->create_subscription<px4_msgs::msg::VehicleGlobalPosition>(
-      "/fmu/in/aux_global_position", rclcpp::QoS(10).best_effort(),
+      "/fmu/in/aux_global_position" +
+      px4_ros2::getMessageNameVersion<px4_msgs::msg::VehicleGlobalPosition>(), rclcpp::QoS(
+        10).best_effort(),
       [this](px4_msgs::msg::VehicleGlobalPosition::UniquePtr msg) {
         _update_msg = std::move(msg);
       });
@@ -53,7 +58,7 @@ protected:
     auto start_time = _node->get_clock()->now();
     while (!_update_msg) {
       rclcpp::sleep_for(kSleepInterval);
-      rclcpp::spin_some(_node);
+      _executor.spin_some();
       const auto elapsed_time = _node->get_clock()->now() - start_time;
       if (elapsed_time >= kTimeoutDuration) {
         return _update_msg != nullptr;
@@ -63,6 +68,7 @@ protected:
   }
 
   std::shared_ptr<rclcpp::Node> _node;
+  rclcpp::executors::SingleThreadedExecutor _executor;
   std::shared_ptr<px4_ros2::GlobalPositionMeasurementInterface> _global_navigation_interface;
   rclcpp::Subscription<px4_msgs::msg::VehicleGlobalPosition>::SharedPtr _subscriber;
   px4_msgs::msg::VehicleGlobalPosition::UniquePtr _update_msg;

@@ -113,6 +113,11 @@ public:
 
   RequirementFlags & modeRequirements() {return _mode_requirements;}
 
+  void disableWatchdogTimer()
+  {
+    _watchdog_timer.reset();
+  }
+
 private:
   friend class ModeBase;
   friend class ModeExecutorBase;
@@ -124,6 +129,7 @@ private:
   std::shared_ptr<Registration> _registration;
   CheckCallback _check_callback;
   bool _check_triggered{true};
+  bool _first_request{true};
 
   rclcpp::Subscription<px4_msgs::msg::ArmingCheckRequest>::SharedPtr _arming_check_request_sub;
   rclcpp::Publisher<px4_msgs::msg::ArmingCheckReply>::SharedPtr _arming_check_reply_pub;

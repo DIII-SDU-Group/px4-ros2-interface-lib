@@ -16,6 +16,7 @@
 #include "manual_control_input.hpp"
 #include <px4_ros2/common/setpoint_base.hpp>
 #include <px4_ros2/common/context.hpp>
+#include <px4_ros2/components/shared_subscription.hpp>
 
 class Registration;
 struct RegistrationSettings;
@@ -84,25 +85,48 @@ public:
     px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_AUTO_RTL;
   static constexpr ModeID kModeIDPrecisionLand =
     px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_AUTO_PRECLAND;
+  static constexpr ModeID kModeIDLoiter =
+    px4_msgs::msg::VehicleStatus::NAVIGATION_STATE_AUTO_LOITER;
 
   struct Settings
   {
     // NOLINTNEXTLINE allow implicit conversion
-    Settings(
-      std::string mode_name, bool want_activate_even_while_disarmed = false,
-      ModeID request_replace_internal_mode = kModeIDInvalid)
-    : name(std::move(mode_name)), activate_even_while_disarmed(want_activate_even_while_disarmed),
-      replace_internal_mode(request_replace_internal_mode) {}
-    std::string name;             ///< Name of the mode with length < 25 characters
-    bool activate_even_while_disarmed{true};             ///< If true, the mode is also activated while disarmed if selected
+    Settings(std::string mode_name)
+    : name(std::move(mode_name)) {}
+
+    const std::string name;             ///< Name of the mode with length < 25 characters
+    bool activate_even_while_disarmed{false};             ///< If true, the mode is also activated while disarmed if selected
     ModeID replace_internal_mode{kModeIDInvalid};             ///< Can be used to replace an fmu-internal mode
+    bool prevent_arming{false}; ///< Prevent arming while in this mode
+    bool user_selectable{true}; ///< If true, the mode is selectable by the user
+
+    Settings & activateEvenWhileDisarmed(bool activate)
+    {
+      activate_even_while_disarmed = activate;
+      return *this;
+    }
+    Settings & replaceInternalMode(ModeID mode)
+    {
+      replace_internal_mode = mode;
+      return *this;
+    }
+    Settings & preventArming(bool prevent)
+    {
+      prevent_arming = prevent;
+      return *this;
+    }
+    Settings & userSelectable(bool selectable)
+    {
+      user_selectable = selectable;
+      return *this;
+    }
   };
 
   ModeBase(
     rclcpp::Node & node, Settings settings,
     const std::string & topic_namespace_prefix = "");
   ModeBase(const ModeBase &) = delete;
-  virtual ~ModeBase() = default;
+  virtual ~ModeBase();
 
   /**
    * Register the mode. Call this once on startup, unless there's an associated executor. This is a blocking method.
@@ -169,6 +193,10 @@ protected:
   void setSkipMessageCompatibilityCheck() {_skip_message_compatibility_check = true;}
   void overrideRegistration(const std::shared_ptr<Registration> & registration);
 
+  void disableWatchdogTimer() {_health_and_arming_checks.disableWatchdogTimer();}
+
+  bool defaultMessageCompatibilityCheck();
+
 private:
   void addSetpointType(SetpointBase * setpoint) override;
   void setRequirement(const RequirementFlags & requirement_flags) override;
@@ -199,9 +227,10 @@ private:
 
   HealthAndArmingChecks _health_and_arming_checks;
 
-  rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr _vehicle_status_sub;
   rclcpp::Publisher<px4_msgs::msg::ModeCompleted>::SharedPtr _mode_completed_pub;
   rclcpp::Publisher<px4_msgs::msg::VehicleControlMode>::SharedPtr _config_control_setpoints_pub;
+
+  SharedSubscriptionCallbackInstance _vehicle_status_sub_cb;
 
   bool _is_active{false};       ///< Mode is currently selected
   bool _is_armed{false};       ///< Is vehicle armed?

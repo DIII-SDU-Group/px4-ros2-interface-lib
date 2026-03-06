@@ -21,7 +21,7 @@ class FlightModeTest : public px4_ros2::ModeBase
 {
 public:
   explicit FlightModeTest(rclcpp::Node & node)
-  : ModeBase(node, Settings{kName, false})
+  : ModeBase(node, kName)
   {
     _trajectory_setpoint = std::make_shared<px4_ros2::TrajectorySetpointType>(*this);
   }
@@ -57,9 +57,9 @@ private:
 class ModeExecutorTest : public px4_ros2::ModeExecutorBase
 {
 public:
-  ModeExecutorTest(rclcpp::Node & node, px4_ros2::ModeBase & owned_mode)
-  : ModeExecutorBase(node, px4_ros2::ModeExecutorBase::Settings{}, owned_mode),
-    _node(node)
+  explicit ModeExecutorTest(px4_ros2::ModeBase & owned_mode)
+  : ModeExecutorBase(px4_ros2::ModeExecutorBase::Settings{}, owned_mode),
+    _node(owned_mode.node())
   {
   }
 

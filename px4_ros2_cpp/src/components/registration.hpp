@@ -25,6 +25,7 @@ struct RegistrationSettings
   bool enable_replace_internal_mode{false};
   px4_ros2::ModeBase::ModeID replace_internal_mode{};
   bool activate_mode_immediately{false};
+  bool user_selectable{true};
 };
 
 class Registration
@@ -53,7 +54,7 @@ public:
 protected:
   void setRegistrationDetails(
     int arming_check_id, px4_ros2::ModeBase::ModeID mode_id,
-    int mode_executor_id);
+    int mode_executor_id, const std::string & name);
 
 private:
   rclcpp::Subscription<px4_msgs::msg::RegisterExtComponentReply>::SharedPtr

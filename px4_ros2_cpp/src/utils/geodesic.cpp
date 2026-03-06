@@ -4,8 +4,10 @@
  ****************************************************************************/
 
 #include <px4_ros2/utils/geodesic.hpp>
+#include <px4_ros2/utils/message_version.hpp>
 
 #include "map_projection_impl.hpp"
+#include <px4_ros2/common/exception.hpp>
 
 namespace px4_ros2
 {
@@ -14,16 +16,20 @@ MapProjection::MapProjection(Context & context)
 : _node(context.node())
 {
   _map_projection_math = std::make_unique<MapProjectionImpl>();
-  _vehicle_local_position_sub = _node.create_subscription<px4_msgs::msg::VehicleLocalPosition>(
-    "fmu/out/vehicle_local_position", rclcpp::QoS(1).best_effort(),
-    [this](px4_msgs::msg::VehicleLocalPosition::UniquePtr msg) {
-      vehicleLocalPositionCallback(std::move(msg));
+  // Use a shared subscription instance as this is a higher-rate topic
+  _vehicle_local_position_cb = SharedSubscription<px4_msgs::msg::VehicleLocalPosition>::create(
+    _node,
+    "fmu/out/vehicle_local_position" +
+    px4_ros2::getMessageNameVersion<px4_msgs::msg::VehicleLocalPosition>(),
+    [this](const px4_msgs::msg::VehicleLocalPosition::UniquePtr & msg) {
+      vehicleLocalPositionCallback(msg);
     });
 }
 
 MapProjection::~MapProjection() = default;
 
-void MapProjection::vehicleLocalPositionCallback(px4_msgs::msg::VehicleLocalPosition::UniquePtr msg)
+void MapProjection::vehicleLocalPositionCallback(
+  const px4_msgs::msg::VehicleLocalPosition::UniquePtr & msg)
 {
   const uint64_t timestamp_cur = msg->ref_timestamp;
   const uint64_t timestamp_ref = _map_projection_math->getProjectionReferenceTimestamp();
@@ -53,7 +59,7 @@ bool MapProjection::isInitialized() const
 void MapProjection::assertInitalized() const
 {
   if (!isInitialized()) {
-    throw std::runtime_error("Map projection impossible: uninitialized.");
+    throw Exception("Map projection impossible: uninitialized.");
   }
 }
 
@@ -151,7 +157,8 @@ Eigen::Vector2d globalPositionFromLineAndDist(
   const Eigen::Vector2d & global_position_line_end,
   float dist_from_start)
 {
-  float heading = headingToGlobalPosition(global_position_line_start, global_position_line_end);
+  const float heading =
+    headingToGlobalPosition(global_position_line_start, global_position_line_end);
   return globalPositionFromHeadingAndDist(global_position_line_start, heading, dist_from_start);
 }
 
@@ -187,8 +194,8 @@ Eigen::Vector2d addVectorToGlobalPosition(
 {
   Eigen::Vector2d global_position_res;
 
-  double lat_now_rad = degToRad(global_position.x());
-  double lon_now_rad = degToRad(global_position.y());
+  const double lat_now_rad = degToRad(global_position.x());
+  const double lon_now_rad = degToRad(global_position.y());
 
   global_position_res.x() =
     radToDeg(lat_now_rad + static_cast<double>(vector_ne.x()) / kRadiusOfEarth);

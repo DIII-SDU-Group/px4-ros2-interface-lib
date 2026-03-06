@@ -6,6 +6,11 @@ on:
   pull_request:
     branches:
       - '*'
+    paths:
+      # Only build the package when the px4_msgs version is updated, as the
+      # configured px4_msgs package is typically older, which makes the build
+      # fail for most PRs.
+      - 'px4_ros2_cpp/rosdep-*.yaml'
 
 jobs:
   build:
@@ -13,14 +18,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [{runner: buildjet-2vcpu-ubuntu-2204-arm, platform: linux/arm64}, {runner: buildjet-2vcpu-ubuntu-2204, platform: linux/amd64}]
+        platform:
+          - platform: linux/arm64
+            runner: "${{ vars.RUNSON_CI_BUILDER_DEFAULT_ARM64 }}"
+          - platform: linux/amd64
+            runner: "${{ vars.RUNSON_CI_BUILDER_DEFAULT_X64 }}"
         distro:
           - ubuntu: jammy
             ros2: humble
           - ubuntu: noble
+            ros2: jazzy
+          - ubuntu: noble
             ros2: rolling
-          - ubuntu: focal
-            ros2: foxy
 
     uses: Auterion/ros-debian-workflow/.github/workflows/build-ros-debian.yml@main
     with:
