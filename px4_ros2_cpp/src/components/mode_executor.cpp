@@ -412,8 +412,17 @@ bool ModeExecutorBase::deferFailsafesSync(bool enabled, int timeout_s)
   if (enabled && _is_in_charge && _registration->registered() &&
     _prev_failsafe_defer_state == px4_msgs::msg::VehicleStatus::FAILSAFE_DEFER_STATE_DISABLED)
   {
+    // The primary vehicle-status subscription is already owned by the node's executor wait set.
+    // Use a short-lived subscription for synchronous confirmation, just as sendCommandSync()
+    // does for command acknowledgements, to avoid a second-wait-set exception on ROS Jazzy.
+    const auto vehicle_status_sub = _node.create_subscription<px4_msgs::msg::VehicleStatus>(
+      _topic_namespace_prefix + "fmu/out/vehicle_status" +
+      px4_ros2::getMessageNameVersion<px4_msgs::msg::VehicleStatus>(), rclcpp::QoS(
+        1).best_effort(),
+      [](px4_msgs::msg::VehicleStatus::UniquePtr msg) {});
+
     rclcpp::WaitSet wait_set;
-    wait_set.add_subscription(_vehicle_status_sub);
+    wait_set.add_subscription(vehicle_status_sub);
 
     bool got_message = false;
     auto start_time = _node.now();
@@ -433,7 +442,7 @@ bool ModeExecutorBase::deferFailsafesSync(bool enabled, int timeout_s)
         px4_msgs::msg::VehicleStatus msg;
         rclcpp::MessageInfo info;
 
-        if (_vehicle_status_sub->take(msg, info)) {
+        if (vehicle_status_sub->take(msg, info)) {
           if (msg.failsafe_defer_state !=
             px4_msgs::msg::VehicleStatus::FAILSAFE_DEFER_STATE_DISABLED)
           {
@@ -449,7 +458,7 @@ bool ModeExecutorBase::deferFailsafesSync(bool enabled, int timeout_s)
       }
     }
 
-    wait_set.remove_subscription(_vehicle_status_sub);
+    wait_set.remove_subscription(vehicle_status_sub);
 
     return got_message;
   }
