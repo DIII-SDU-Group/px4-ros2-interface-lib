@@ -4,6 +4,7 @@
  ****************************************************************************/
 
 #include "registration.hpp"
+#include "px4_ros2/diagnostics/hil_trace.hpp"
 
 #include <cassert>
 #include <random>
@@ -17,10 +18,18 @@ using namespace std::chrono_literals;
 Registration::Registration(rclcpp::Node & node, const std::string & topic_namespace_prefix)
 : _node(node)
 {
+  auto created = px4_ros2::diagnostics::HilTrace::event("registration_object_constructed");
+  created.number("registration_object_address", reinterpret_cast<uintptr_t>(this));
+  created.text("node", node.get_fully_qualified_name());
+  created.commit();
+
   _register_ext_component_reply_sub =
     node.create_subscription<px4_msgs::msg::RegisterExtComponentReply>(
     topic_namespace_prefix + "fmu/out/register_ext_component_reply" +
     px4_ros2::getMessageNameVersion<px4_msgs::msg::RegisterExtComponentReply>(),
+    // PX4's uXRCE-DDS bridge offers this reply stream as best-effort.  A
+    // reliable subscriber is incompatible with that endpoint and leaves the
+    // external-mode registration loop waiting forever for replies.
     rclcpp::QoS(1).best_effort(),
     [](px4_msgs::msg::RegisterExtComponentReply::UniquePtr msg) {
     });
@@ -71,6 +80,18 @@ bool Registration::doRegister(const RegistrationSettings & settings)
   std::mt19937 gen(rd());
   std::uniform_int_distribution<uint64_t> distrib{};
   request.request_id = distrib(gen);
+  _last_request_id = request.request_id;
+
+  auto begin = px4_ros2::diagnostics::HilTrace::event("registration_begin");
+  begin.number("registration_object_address", reinterpret_cast<uintptr_t>(this));
+  begin.text("node", _node.get_fully_qualified_name());
+  begin.text("registration_name", settings.name);
+  begin.number("request_id", request.request_id);
+  begin.number("registration_generation", _diagnostic_generation + 1);
+  begin.boolean("register_arming_check", settings.register_arming_check);
+  begin.boolean("register_mode", settings.register_mode);
+  begin.boolean("register_mode_executor", settings.register_mode_executor);
+  begin.commit();
 
   // wait for subscription, it might take a while initially...
   for (int i = 0; i < 100; ++i) {
@@ -90,6 +111,12 @@ bool Registration::doRegister(const RegistrationSettings & settings)
 
   for (int retries = 0; retries < 5 && !got_reply; ++retries) {
     request.timestamp = 0; // Let PX4 set the timestamp
+    auto published = px4_ros2::diagnostics::HilTrace::event("registration_request_published");
+    published.number("registration_object_address", reinterpret_cast<uintptr_t>(this));
+    published.text("registration_name", settings.name);
+    published.number("request_id", request.request_id);
+    published.number("attempt", retries + 1);
+    published.commit();
     _register_ext_component_request_pub->publish(request);
 
     // wait for publisher, it might take a while initially...
@@ -121,6 +148,20 @@ bool Registration::doRegister(const RegistrationSettings & settings)
         if (_register_ext_component_reply_sub->take(reply, info)) {
           reply.name.back() = '\0';
 
+          const auto &rmw_info = info.get_rmw_message_info();
+          auto observed = px4_ros2::diagnostics::HilTrace::event("registration_reply_observed");
+          observed.number("registration_object_address", reinterpret_cast<uintptr_t>(this));
+          observed.text("registration_name", settings.name);
+          observed.number("request_id", request.request_id);
+          observed.number("reply_request_id", reply.request_id);
+          observed.number("reply_arming_check_id", reply.arming_check_id);
+          observed.number("reply_mode_id", static_cast<uint64_t>(reply.mode_id));
+          observed.boolean("reply_success", reply.success);
+          observed.number("source_timestamp", static_cast<uint64_t>(rmw_info.source_timestamp));
+          observed.number("received_timestamp", static_cast<uint64_t>(rmw_info.received_timestamp));
+          observed.text("publisher_gid", px4_ros2::diagnostics::HilTrace::gid(rmw_info.publisher_gid));
+          observed.commit();
+
           if (strcmp(
               reinterpret_cast<const char *>(reply.name.data()),
               settings.name.c_str()) == 0 &&
@@ -137,6 +178,16 @@ bool Registration::doRegister(const RegistrationSettings & settings)
                   reinterpret_cast<char *>(_unregister_ext_component.name.data()),
                   settings.name.c_str());
                 _registered = true;
+                ++_diagnostic_generation;
+                auto completed = px4_ros2::diagnostics::HilTrace::event("registration_completed");
+                completed.number("registration_object_address", reinterpret_cast<uintptr_t>(this));
+                completed.text("registration_name", settings.name);
+                completed.number("request_id", request.request_id);
+                completed.number("registration_generation", _diagnostic_generation);
+                completed.number("arming_check_id", reply.arming_check_id);
+                completed.number("mode_id", static_cast<uint64_t>(reply.mode_id));
+                completed.number("mode_executor_id", static_cast<uint64_t>(reply.mode_executor_id));
+                completed.commit();
               } else {
                 RCLCPP_FATAL(
                   _node.get_logger(), "Incompatible ROS2 library API version: got %i, expected %i",
@@ -162,16 +213,39 @@ bool Registration::doRegister(const RegistrationSettings & settings)
 
   wait_set.remove_subscription(_register_ext_component_reply_sub);
 
+  auto end = px4_ros2::diagnostics::HilTrace::event("registration_end");
+  end.number("registration_object_address", reinterpret_cast<uintptr_t>(this));
+  end.text("registration_name", settings.name);
+  end.number("request_id", request.request_id);
+  end.number("registration_generation", _diagnostic_generation);
+  end.boolean("registered", _registered);
+  end.number("arming_check_id", static_cast<uint64_t>(_unregister_ext_component.arming_check_id));
+  end.number("mode_id", static_cast<uint64_t>(_unregister_ext_component.mode_id));
+  end.commit();
+
   return _registered;
 }
 
 void Registration::doUnregister()
 {
   if (_registered) {
+    auto begin = px4_ros2::diagnostics::HilTrace::event("registration_unregister_begin");
+    begin.number("registration_object_address", reinterpret_cast<uintptr_t>(this));
+    begin.text("registration_name", name());
+    begin.number("registration_generation", _diagnostic_generation);
+    begin.number("request_id", _last_request_id);
+    begin.number("arming_check_id", static_cast<uint64_t>(_unregister_ext_component.arming_check_id));
+    begin.number("mode_id", static_cast<uint64_t>(_unregister_ext_component.mode_id));
+    begin.commit();
     RCLCPP_DEBUG(_node.get_logger(), "Unregistering");
     _unregister_ext_component.timestamp = 0; // Let PX4 set the timestamp
     _unregister_ext_component_pub->publish(_unregister_ext_component);
     _registered = false;
+    auto end = px4_ros2::diagnostics::HilTrace::event("registration_unregister_end");
+    end.number("registration_object_address", reinterpret_cast<uintptr_t>(this));
+    end.text("registration_name", name());
+    end.number("registration_generation", _diagnostic_generation);
+    end.commit();
   }
 }
 
@@ -183,4 +257,5 @@ void Registration::setRegistrationDetails(
   _unregister_ext_component.mode_id = mode_id;
   _unregister_ext_component.mode_executor_id = mode_executor_id;
   _registered = true;
+  ++_diagnostic_generation;
 }

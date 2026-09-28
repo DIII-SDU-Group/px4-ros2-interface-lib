@@ -14,6 +14,7 @@
 
 #include <memory>
 #include <functional>
+#include <cstdint>
 
 class Registration;
 
@@ -97,6 +98,7 @@ public:
   HealthAndArmingChecks(
     rclcpp::Node & node, CheckCallback check_callback,
     const std::string & topic_namespace_prefix = "");
+  ~HealthAndArmingChecks();
   HealthAndArmingChecks(const HealthAndArmingChecks &) = delete;
 
   /**
@@ -123,6 +125,7 @@ private:
   rclcpp::Node & _node;
   std::shared_ptr<Registration> _registration;
   CheckCallback _check_callback;
+  uint64_t _diagnostic_instance_sequence{0};
   bool _check_triggered{true};
 
   rclcpp::Subscription<px4_msgs::msg::ArmingCheckRequest>::SharedPtr _arming_check_request_sub;

@@ -229,21 +229,31 @@ bool messageCompatibilityCheck(
   const std::string & topic_namespace_prefix)
 {
   RCLCPP_DEBUG(node.get_logger(), "Checking message compatibility...");
+  // The mode node may already be attached to a multi-threaded executor when
+  // compatibility is checked. Keep this synchronous response subscription
+  // out of that executor; otherwise its no-op callback can consume a reply
+  // before requestMessageFormat()'s wait set takes it.
+  const auto compatibility_callback_group = node.create_callback_group(
+    rclcpp::CallbackGroupType::MutuallyExclusive, false);
+  rclcpp::SubscriptionOptions compatibility_subscription_options;
+  compatibility_subscription_options.callback_group = compatibility_callback_group;
+
   const rclcpp::Subscription<px4_msgs::msg::MessageFormatResponse>::SharedPtr
     message_format_response_sub
     =
     node.create_subscription<px4_msgs::msg::MessageFormatResponse>(
       topic_namespace_prefix + "fmu/out/message_format_response" +
       px4_ros2::getMessageNameVersion<px4_msgs::msg::MessageFormatResponse>(), rclcpp::QoS(
-        1).best_effort(),
-      [](px4_msgs::msg::MessageFormatResponse::UniquePtr msg) {});
+        1).best_effort().transient_local(),
+      [](px4_msgs::msg::MessageFormatResponse::UniquePtr msg) {},
+      compatibility_subscription_options);
 
   const rclcpp::Publisher<px4_msgs::msg::MessageFormatRequest>::SharedPtr message_format_request_pub
     =
     node.create_publisher<px4_msgs::msg::MessageFormatRequest>(
       topic_namespace_prefix + "fmu/in/message_format_request" +
       px4_ros2::getMessageNameVersion<px4_msgs::msg::MessageFormatRequest>(),
-      1);
+      rclcpp::QoS(1).reliable());
 
   const std::string msgs_dir = ament_index_cpp::get_package_share_directory("px4_msgs");
   if (msgs_dir.empty()) {

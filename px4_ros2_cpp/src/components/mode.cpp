@@ -6,11 +6,13 @@
 #include "px4_ros2/components/mode.hpp"
 #include "px4_ros2/components/message_compatibility_check.hpp"
 #include "px4_ros2/components/wait_for_fmu.hpp"
+#include "px4_ros2/diagnostics/hil_trace.hpp"
 #include "px4_ros2/utils/message_version.hpp"
 
 #include "registration.hpp"
 
 #include <cassert>
+#include <chrono>
 #include <cfloat>
 #include <utility>
 
@@ -33,9 +35,34 @@ ModeBase::ModeBase(
     px4_ros2::getMessageNameVersion<px4_msgs::msg::VehicleStatus>(), rclcpp::QoS(
       1).best_effort(),
     [this](px4_msgs::msg::VehicleStatus::UniquePtr msg) {
+      const auto callback_start = std::chrono::steady_clock::now();
+      auto callback_entry = diagnostics::HilTrace::event("callback_group_callback_entry");
+      callback_entry.text("callback", "external_mode_vehicle_status");
+      callback_entry.text("callback_group", "px4_mode_default_mutually_exclusive");
+      callback_entry.text("callback_group_type", "MutuallyExclusive");
+      callback_entry.text("node", this->node().get_fully_qualified_name());
+      callback_entry.commit();
+      auto status_event = diagnostics::HilTrace::event("vehicle_status_callback");
+      status_event.number("timestamp", msg->timestamp);
+      status_event.number("nav_state", msg->nav_state);
+      status_event.boolean("failsafe", msg->failsafe);
+      status_event.text("callback_group", "px4_mode_default_mutually_exclusive");
+      status_event.text("callback_group_type", "MutuallyExclusive");
+      status_event.commit();
       if (_registration->registered()) {
         vehicleStatusUpdated(msg);
       }
+      const auto callback_end = std::chrono::steady_clock::now();
+      auto callback_exit = diagnostics::HilTrace::event("callback_group_callback_exit");
+      callback_exit.text("callback", "external_mode_vehicle_status");
+      callback_exit.text("callback_group", "px4_mode_default_mutually_exclusive");
+      callback_exit.text("callback_group_type", "MutuallyExclusive");
+      callback_exit.text("node", this->node().get_fully_qualified_name());
+      callback_exit.number(
+        "duration_ns",
+        static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+          callback_end - callback_start).count()));
+      callback_exit.commit();
     });
   _mode_completed_pub = node.create_publisher<px4_msgs::msg::ModeCompleted>(
     topic_namespace_prefix + "fmu/in/mode_completed" +
@@ -120,6 +147,12 @@ RegistrationSettings ModeBase::getRegistrationSettings() const
 
 void ModeBase::callOnActivate()
 {
+  const auto callback_start = std::chrono::steady_clock::now();
+  auto event = diagnostics::HilTrace::event("external_mode_activate_entry");
+  event.text("mode", _registration->name());
+  event.text("callback_group", "px4_mode_default_mutually_exclusive");
+  event.text("callback_group_type", "MutuallyExclusive");
+  event.commit();
   RCLCPP_DEBUG(node().get_logger(), "Mode '%s' activated", _registration->name().c_str());
   _is_active = true;
   _completed = false;
@@ -131,14 +164,40 @@ void ModeBase::callOnActivate()
   }
 
   updateSetpointUpdateTimer();
+  const auto callback_end = std::chrono::steady_clock::now();
+  auto exit = diagnostics::HilTrace::event("external_mode_activate_exit");
+  exit.text("mode", _registration->name());
+  exit.text("callback_group", "px4_mode_default_mutually_exclusive");
+  exit.text("callback_group_type", "MutuallyExclusive");
+  exit.number(
+    "duration_ns",
+    static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+      callback_end - callback_start).count()));
+  exit.commit();
 }
 
 void ModeBase::callOnDeactivate()
 {
+  const auto callback_start = std::chrono::steady_clock::now();
+  auto event = diagnostics::HilTrace::event("external_mode_deactivate_entry");
+  event.text("mode", _registration->name());
+  event.text("callback_group", "px4_mode_default_mutually_exclusive");
+  event.text("callback_group_type", "MutuallyExclusive");
+  event.commit();
   RCLCPP_DEBUG(node().get_logger(), "Mode '%s' deactivated", _registration->name().c_str());
   _is_active = false;
   onDeactivate();
   updateSetpointUpdateTimer();
+  const auto callback_end = std::chrono::steady_clock::now();
+  auto exit = diagnostics::HilTrace::event("external_mode_deactivate_exit");
+  exit.text("mode", _registration->name());
+  exit.text("callback_group", "px4_mode_default_mutually_exclusive");
+  exit.text("callback_group_type", "MutuallyExclusive");
+  exit.number(
+    "duration_ns",
+    static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+      callback_end - callback_start).count()));
+  exit.commit();
 }
 
 void ModeBase::updateSetpointUpdateTimer()
@@ -154,7 +213,25 @@ void ModeBase::updateSetpointUpdateTimer()
           const auto now = node().get_clock()->now();
           const float dt_s = (now - _last_setpoint_update).seconds();
           _last_setpoint_update = now;
+          const auto callback_start = std::chrono::steady_clock::now();
+          auto callback_entry = diagnostics::HilTrace::event("callback_group_callback_entry");
+          callback_entry.text("callback", "external_mode_setpoint_timer");
+          callback_entry.text("callback_group", "px4_mode_default_mutually_exclusive");
+          callback_entry.text("callback_group_type", "MutuallyExclusive");
+          callback_entry.text("node", node().get_fully_qualified_name());
+          callback_entry.commit();
           updateSetpoint(dt_s);
+          const auto callback_end = std::chrono::steady_clock::now();
+          auto callback_exit = diagnostics::HilTrace::event("callback_group_callback_exit");
+          callback_exit.text("callback", "external_mode_setpoint_timer");
+          callback_exit.text("callback_group", "px4_mode_default_mutually_exclusive");
+          callback_exit.text("callback_group_type", "MutuallyExclusive");
+          callback_exit.text("node", node().get_fully_qualified_name());
+          callback_exit.number(
+            "duration_ns",
+            static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+              callback_end - callback_start).count()));
+          callback_exit.commit();
         });
     }
 

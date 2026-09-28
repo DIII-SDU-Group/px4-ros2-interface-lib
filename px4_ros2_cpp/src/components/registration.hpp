@@ -44,6 +44,8 @@ public:
   int armingCheckId() const {return _unregister_ext_component.arming_check_id;}
   px4_ros2::ModeBase::ModeID modeId() const {return _unregister_ext_component.mode_id;}
   int modeExecutorId() const {return _unregister_ext_component.mode_executor_id;}
+  uint32_t diagnosticGeneration() const {return _diagnostic_generation;}
+  uint64_t lastRequestId() const {return _last_request_id;}
 
   std::string name() const
   {
@@ -63,6 +65,8 @@ private:
   rclcpp::Publisher<px4_msgs::msg::UnregisterExtComponent>::SharedPtr _unregister_ext_component_pub;
 
   bool _registered{false};
+  uint32_t _diagnostic_generation{0};
+  uint64_t _last_request_id{0};
   px4_msgs::msg::UnregisterExtComponent _unregister_ext_component{};
   rclcpp::Node & _node;
 };

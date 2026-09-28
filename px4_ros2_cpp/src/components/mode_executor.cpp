@@ -29,7 +29,7 @@ ModeExecutorBase::ModeExecutorBase(
   _vehicle_status_sub = _node.create_subscription<px4_msgs::msg::VehicleStatus>(
     topic_namespace_prefix + "fmu/out/vehicle_status" +
     px4_ros2::getMessageNameVersion<px4_msgs::msg::VehicleStatus>(), rclcpp::QoS(
-      1).best_effort(),
+      1).best_effort().transient_local(),
     [this](px4_msgs::msg::VehicleStatus::UniquePtr msg) {
       if (_registration->registered()) {
         vehicleStatusUpdated(msg);
@@ -134,7 +134,7 @@ Result ModeExecutorBase::sendCommandSync(
   const auto vehicle_command_ack_sub = _node.create_subscription<px4_msgs::msg::VehicleCommandAck>(
     _topic_namespace_prefix + "fmu/out/vehicle_command_ack" +
     px4_ros2::getMessageNameVersion<px4_msgs::msg::VehicleCommandAck>(), rclcpp::QoS(
-      1).best_effort(),
+      1).best_effort().transient_local(),
     [](px4_msgs::msg::VehicleCommandAck::UniquePtr msg) {});
 
   // Wait until we have a publisher
