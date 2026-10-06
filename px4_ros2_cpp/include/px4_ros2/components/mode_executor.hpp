@@ -15,6 +15,7 @@
 #include <px4_msgs/msg/mode_completed.hpp>
 
 #include <functional>
+#include <mutex>
 
 class Registration;
 
@@ -191,6 +192,18 @@ private:
 
   rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr _vehicle_status_sub;
   rclcpp::Publisher<px4_msgs::msg::VehicleCommand>::SharedPtr _vehicle_command_pub;
+
+  // Command acknowledgements and the failsafe-deferral confirmation are read
+  // synchronously through a wait set. Their subscriptions live as long as the
+  // executor, in a callback group no executor services, so PX4's bridge has
+  // matched them long before the first command. A subscription created per
+  // command could miss every ack while the bridge was still matching it (HIL
+  // 2026-10-05: "Cmd 100001: timeout, no ack received" though PX4 acked all
+  // three attempts).
+  rclcpp::CallbackGroup::SharedPtr _sync_wait_callback_group;
+  rclcpp::Subscription<px4_msgs::msg::VehicleCommandAck>::SharedPtr _vehicle_command_ack_sub;
+  rclcpp::Subscription<px4_msgs::msg::VehicleStatus>::SharedPtr _sync_vehicle_status_sub;
+  std::mutex _sync_wait_mutex;
 
   ScheduledMode _current_scheduled_mode;
   WaitForVehicleStatusCondition _current_wait_vehicle_status;

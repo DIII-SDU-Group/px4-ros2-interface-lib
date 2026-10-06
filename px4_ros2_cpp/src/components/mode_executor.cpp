@@ -41,6 +41,21 @@ ModeExecutorBase::ModeExecutorBase(
     px4_ros2::getMessageNameVersion<px4_msgs::msg::VehicleCommand>(),
     1);
 
+  // Not added to any executor: only the synchronous waits read these.
+  _sync_wait_callback_group = _node.create_callback_group(
+    rclcpp::CallbackGroupType::MutuallyExclusive, false);
+  rclcpp::SubscriptionOptions sync_wait_options;
+  sync_wait_options.callback_group = _sync_wait_callback_group;
+  _vehicle_command_ack_sub = _node.create_subscription<px4_msgs::msg::VehicleCommandAck>(
+    topic_namespace_prefix + "fmu/out/vehicle_command_ack" +
+    px4_ros2::getMessageNameVersion<px4_msgs::msg::VehicleCommandAck>(), rclcpp::QoS(
+      1).best_effort().transient_local(),
+    [](px4_msgs::msg::VehicleCommandAck::UniquePtr msg) {}, sync_wait_options);
+  _sync_vehicle_status_sub = _node.create_subscription<px4_msgs::msg::VehicleStatus>(
+    topic_namespace_prefix + "fmu/out/vehicle_status" +
+    px4_ros2::getMessageNameVersion<px4_msgs::msg::VehicleStatus>(), rclcpp::QoS(
+      1).best_effort(),
+    [](px4_msgs::msg::VehicleStatus::UniquePtr msg) {}, sync_wait_options);
 }
 
 bool ModeExecutorBase::doRegister()
@@ -127,15 +142,16 @@ Result ModeExecutorBase::sendCommandSync(
   cmd.source_component = px4_msgs::msg::VehicleCommand::COMPONENT_MODE_EXECUTOR_START + id();
   cmd.timestamp = 0; // Let PX4 set the timestamp
 
-  // Create a new subscription here instead of in the ModeExecutorBase constructor, because
-  // ROS Jazzy would throw an exception 'subscription already associated with a wait set'
-  // (We could also use exchange_in_use_by_wait_set_state(), but that might cause an
-  // inconsistent state)
-  const auto vehicle_command_ack_sub = _node.create_subscription<px4_msgs::msg::VehicleCommandAck>(
-    _topic_namespace_prefix + "fmu/out/vehicle_command_ack" +
-    px4_ros2::getMessageNameVersion<px4_msgs::msg::VehicleCommandAck>(), rclcpp::QoS(
-      1).best_effort().transient_local(),
-    [](px4_msgs::msg::VehicleCommandAck::UniquePtr msg) {});
+  // The persistent subscription (see the constructor) belongs to no executor,
+  // so this wait set may take it. An ack still queued from an earlier command
+  // must not answer this one: acks carry only the command id.
+  std::lock_guard<std::mutex> sync_lock(_sync_wait_mutex);
+  const auto & vehicle_command_ack_sub = _vehicle_command_ack_sub;
+  {
+    px4_msgs::msg::VehicleCommandAck stale;
+    rclcpp::MessageInfo stale_info;
+    while (vehicle_command_ack_sub->take(stale, stale_info)) {}
+  }
 
   // Wait until we have a publisher
   auto start_time = std::chrono::steady_clock::now();
@@ -406,20 +422,24 @@ void ModeExecutorBase::vehicleStatusUpdated(const px4_msgs::msg::VehicleStatus::
 
 bool ModeExecutorBase::deferFailsafesSync(bool enabled, int timeout_s)
 {
+  // To avoid race conditions we wait until the FMU sets it if the executor is in charge
+  const bool confirm = enabled && _is_in_charge && _registration->registered() &&
+    _prev_failsafe_defer_state == px4_msgs::msg::VehicleStatus::FAILSAFE_DEFER_STATE_DISABLED;
+  // The primary vehicle-status subscription is owned by the node's executor
+  // wait set; confirm on the persistent synchronous one (see the
+  // constructor), dropping any status queued before the request.
+  std::unique_lock<std::mutex> sync_lock(_sync_wait_mutex, std::defer_lock);
+  if (confirm) {
+    sync_lock.lock();
+    px4_msgs::msg::VehicleStatus stale;
+    rclcpp::MessageInfo stale_info;
+    while (_sync_vehicle_status_sub->take(stale, stale_info)) {}
+  }
+
   _config_overrides.deferFailsafes(enabled, timeout_s);
 
-  // To avoid race conditions we wait until the FMU sets it if the executor is in charge
-  if (enabled && _is_in_charge && _registration->registered() &&
-    _prev_failsafe_defer_state == px4_msgs::msg::VehicleStatus::FAILSAFE_DEFER_STATE_DISABLED)
-  {
-    // The primary vehicle-status subscription is already owned by the node's executor wait set.
-    // Use a short-lived subscription for synchronous confirmation, just as sendCommandSync()
-    // does for command acknowledgements, to avoid a second-wait-set exception on ROS Jazzy.
-    const auto vehicle_status_sub = _node.create_subscription<px4_msgs::msg::VehicleStatus>(
-      _topic_namespace_prefix + "fmu/out/vehicle_status" +
-      px4_ros2::getMessageNameVersion<px4_msgs::msg::VehicleStatus>(), rclcpp::QoS(
-        1).best_effort(),
-      [](px4_msgs::msg::VehicleStatus::UniquePtr msg) {});
+  if (confirm) {
+    const auto & vehicle_status_sub = _sync_vehicle_status_sub;
 
     rclcpp::WaitSet wait_set;
     wait_set.add_subscription(vehicle_status_sub);
